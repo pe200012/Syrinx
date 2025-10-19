@@ -1,5 +1,6 @@
 import { createClient, FileStat, WebDAVClient } from "webdav";
-import type { Track, WebDavConnection } from "../types";
+import { parseBlob } from "music-metadata-browser";
+import type { Track, TrackMetadata, WebDavConnection } from "../types";
 
 const AUDIO_EXTENSIONS = new Set([
     ".mp3",
@@ -65,6 +66,7 @@ function mapToTrack(entry: FileStat, rootPath: string): Track {
 export class WebDavAudioClient {
     private client: WebDAVClient;
     private readonly basePath: string;
+    private readonly metadataCache = new Map<string, TrackMetadata | null>();
 
     constructor(private readonly connection: WebDavConnection, rootPath = "/") {
         this.basePath = normalizePath(rootPath);
@@ -83,7 +85,7 @@ export class WebDavAudioClient {
             deep
         });
 
-        const entries = Array.isArray(results) ? results : [results];
+        const entries = (Array.isArray(results) ? results : [results]) as FileStat[];
 
         return entries.filter(isAudioFile).map((entry) => mapToTrack(entry, root));
     }
@@ -96,15 +98,15 @@ export class WebDavAudioClient {
     async probeCoverArt(trackPath: string): Promise<string | null> {
         const directory = normalizePath(trackPath).split("/").slice(0, -1).join("/") || "/";
         const candidatePaths = [
+            `${directory}/folder.jpg`,
+            `${directory}/folder.png`,
             `${directory}/cover.jpg`,
             `${directory}/cover.png`,
-            `${directory}/folder.jpg`,
-            `${directory}/folder.png`
         ];
 
         for (const candidate of candidatePaths) {
             try {
-                const stat = await this.client.stat(candidate);
+                const stat = (await this.client.stat(candidate)) as FileStat;
                 if (stat.type === "file") {
                     return this.client.getFileDownloadLink(candidate);
                 }
@@ -115,6 +117,107 @@ export class WebDavAudioClient {
         }
 
         return null;
+    }
+
+    async inferMetadata(trackPath: string): Promise<TrackMetadata | null> {
+        const normalized = normalizePath(trackPath);
+        const pathParts = normalized.split("/");
+
+        // Get filename without extension
+        const filename = pathParts[pathParts.length - 1];
+        const extensionIndex = filename.lastIndexOf(".");
+        const nameWithoutExt = extensionIndex > 0 ? filename.slice(0, extensionIndex) : filename;
+
+        // Extract track number and title from filename (e.g., "01. xxx")
+        const trackMatch = nameWithoutExt.match(/^(\d+)\.\s*(.+)$/);
+        const title = trackMatch ? trackMatch[2].trim() : nameWithoutExt;
+        const trackNumber = trackMatch ? parseInt(trackMatch[1], 10) : undefined;
+
+        let artist: string | undefined;
+        let album: string | undefined;
+
+        // Try to extract artist and album from parent directories
+        for (let i = pathParts.length - 2; i >= 0; i--) {
+            const part = pathParts[i];
+
+            // Extract artist from [artist] format
+            const artistMatch = part.match(/^\[([^\]]+)\]$/);
+            if (artistMatch && !artist) {
+                artist = artistMatch[1].trim();
+                continue;
+            }
+
+            // Extract album from date + catalog + album format
+            const albumMatch = part.match(/^\d{4}\.\d{2}\.\d{2}\s+(?:\[[^\]]+\]\s+)?(.+)$/);
+            if (albumMatch && !album) {
+                album = albumMatch[1].trim();
+                continue;
+            }
+
+            // If we haven't found album yet, use as-is
+            if (!album && part && !part.match(/^\[.*\]$/)) {
+                album = part.trim();
+            }
+        }
+
+        const result: TrackMetadata = {
+            title: title || undefined,
+            artist: artist || undefined,
+            album: album || undefined,
+            trackNumber: trackNumber
+        };
+
+        const hasInformation = Boolean(result.title || result.artist || result.album);
+        return hasInformation ? result : null;
+    }
+
+    async fetchMetadata(trackPath: string): Promise<TrackMetadata | null> {
+        const normalized = normalizePath(trackPath);
+        if (this.metadataCache.has(normalized)) {
+            return this.metadataCache.get(normalized) ?? null;
+        }
+
+        try {
+            const url = await this.getStreamUrl(normalized);
+
+            let response: Response | null = null;
+            try {
+                response = await fetch(url, {
+                    headers: {
+                        Range: "bytes=0-131071"
+                    },
+                    credentials: "include"
+                });
+            } catch (networkError) {
+                console.warn("Failed to fetch metadata payload", networkError);
+                this.metadataCache.set(normalized, null);
+                return null;
+            }
+
+            if (!response || !response.ok || response.status === 416 || response.status === 400) {
+                this.metadataCache.set(normalized, null);
+                return null;
+            }
+            const blob = await response.blob();
+            const metadata = await parseBlob(blob);
+            const { common } = metadata;
+
+            const result: TrackMetadata = {
+                title: common.title ?? undefined,
+                artist: common.artist ?? undefined,
+                album: common.album ?? undefined,
+                trackNumber: common.track?.no ?? undefined
+            };
+
+            const hasInformation = Boolean(result.title || result.artist || result.album);
+            const payload = hasInformation ? result : null;
+            this.metadataCache.set(normalized, payload);
+            return payload;
+        } catch (error) {
+            console.warn("Failed to parse metadata", error);
+            this.metadataCache.set(normalized, null);
+            return null;
+        }
     }
 }
 

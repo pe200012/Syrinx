@@ -4,6 +4,13 @@ export interface WebDavConnection {
     password?: string;
 }
 
+export interface TrackMetadata {
+    title?: string;
+    artist?: string;
+    album?: string;
+    trackNumber?: number;
+}
+
 export interface Track {
     id: string;
     name: string;
@@ -12,6 +19,7 @@ export interface Track {
     contentType?: string;
     lastModified?: string;
     displayPath: string;
+    metadata?: TrackMetadata | null;
 }
 
 export interface ConnectionConfig extends WebDavConnection {

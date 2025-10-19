@@ -4,9 +4,14 @@ import LoginForm from "./components/LoginForm";
 import NowPlaying from "./components/NowPlaying";
 import PlayerControls, { type RepeatMode } from "./components/PlayerControls";
 import TrackList from "./components/TrackList";
-import type { ConnectionConfig, Track } from "./types";
+import type { ConnectionConfig, Track, TrackMetadata } from "./types";
 import { WebDavAudioClient } from "./services/webdavClient";
-import { filterTracks, sortTracks } from "./utils/tracks";
+import {
+    filterTracks,
+    sortTracks,
+    type TrackSortKey,
+    type TrackSortOptions
+} from "./utils/tracks";
 import { explainConnectionError } from "./utils/errors";
 
 const STORAGE_KEY = "webdav-music-player:connection";
@@ -77,10 +82,11 @@ export default function App() {
     const [shuffle, setShuffle] = useState(false);
     const [repeatMode, setRepeatMode] = useState<RepeatMode>("off");
     const [coverArtUrl, setCoverArtUrl] = useState<string | null>(null);
+    const [sortOptions, setSortOptions] = useState<TrackSortOptions>({ key: "title", direction: "asc" });
 
     const visibleTracks = useMemo(
-        () => sortTracks(filterTracks(tracks, filter)),
-        [tracks, filter]
+        () => sortTracks(filterTracks(tracks, filter), sortOptions),
+        [tracks, filter, sortOptions]
     );
 
     const currentTrack = useMemo(() => {
@@ -134,7 +140,7 @@ export default function App() {
                     recursive: config.recursive,
                     rootPath: config.rootPath
                 });
-                const sorted = sortTracks(fetched);
+                const sorted = sortTracks(fetched, sortOptions);
                 setClient(clientInstance);
                 setConnection(config);
                 setTracks(sorted);
@@ -154,7 +160,7 @@ export default function App() {
                 setIsLoading(false);
             }
         },
-        []
+        [sortOptions]
     );
 
     const refreshTracks = useCallback(async () => {
@@ -165,7 +171,7 @@ export default function App() {
                 recursive: connection.recursive,
                 rootPath: connection.rootPath
             });
-            const sorted = sortTracks(fetched);
+            const sorted = sortTracks(fetched, sortOptions);
             setTracks(sorted);
             setCurrentTrackId((prev: string | null) => {
                 if (!prev || !sorted.some((track: Track) => track.id === prev)) {
@@ -179,7 +185,55 @@ export default function App() {
         } finally {
             setIsLoading(false);
         }
-    }, [client, connection]);
+    }, [client, connection, sortOptions]);
+
+    const updateTrackMetadata = useCallback(
+        (trackId: string, metadata: TrackMetadata | null) => {
+            setTracks((prev: Track[]) => {
+                const updated = prev.map((track) =>
+                    track.id === trackId
+                        ? {
+                            ...track,
+                            metadata: metadata ?? null
+                        }
+                        : track
+                );
+                return sortTracks(updated, sortOptions);
+            });
+        },
+        [sortOptions]
+    );
+
+    useEffect(() => {
+        if (!client) return;
+        const candidates = visibleTracks.filter((track) => track.metadata === undefined).slice(0, 20);
+        if (candidates.length === 0) {
+            return;
+        }
+        let cancelled = false;
+
+        const fetchMetadataSequentially = async () => {
+            for (const track of candidates) {
+                try {
+                    const metadata = await client.inferMetadata(track.path);
+                    if (!cancelled) {
+                        updateTrackMetadata(track.id, metadata);
+                    }
+                } catch (metadataError) {
+                    console.warn("Failed to read metadata", metadataError);
+                    if (!cancelled) {
+                        updateTrackMetadata(track.id, null);
+                    }
+                }
+            }
+        };
+
+        void fetchMetadataSequentially();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [client, updateTrackMetadata, visibleTracks]);
 
     const advanceToNextTrack = useCallback(
         (auto = false) => {
@@ -311,6 +365,18 @@ export default function App() {
         });
     }, []);
 
+    const handleSortChange = useCallback((key: TrackSortKey) => {
+        setSortOptions((prev) => {
+            if (prev.key === key) {
+                return {
+                    key,
+                    direction: prev.direction === "asc" ? "desc" : "asc"
+                };
+            }
+            return { key, direction: "asc" };
+        });
+    }, []);
+
     useEffect(() => {
         const audio = audioRef.current;
         if (!audio) return;
@@ -402,6 +468,8 @@ export default function App() {
         };
     }, [client, currentTrack, volume]);
 
+    const connected = client && connection;
+
     return (
         <div className="app">
             <header className="app__header">
@@ -410,17 +478,10 @@ export default function App() {
                     <p className="muted">Stream your audio library securely from any WebDAV server.</p>
                 </div>
             </header>
-            <main className="app__layout">
-                <aside className="app__sidebar">
-                    {client && connection ? (
-                        <>
-                            <ConnectionCard
-                                connection={connection}
-                                trackCount={tracks.length}
-                                isLoading={isLoading}
-                                onRefresh={refreshTracks}
-                                onDisconnect={disconnect}
-                            />
+            <main className={`app__layout ${connected ? "app__layout--connected" : "app__layout--auth"}`}>
+                {connected ? (
+                    <>
+                        <section className="app__main">
                             <TrackList
                                 tracks={visibleTracks}
                                 currentTrackId={currentTrack?.id ?? null}
@@ -429,37 +490,53 @@ export default function App() {
                                 filterValue={filter}
                                 onFilterChange={setFilter}
                                 onRefresh={refreshTracks}
+                                sortKey={sortOptions.key}
+                                sortDirection={sortOptions.direction}
+                                onSortChange={handleSortChange}
                             />
-                        </>
-                    ) : (
+                        </section>
+                        <aside className="app__sidebar">
+                            <ConnectionCard
+                                connection={connection}
+                                trackCount={tracks.length}
+                                isLoading={isLoading}
+                                onRefresh={refreshTracks}
+                                onDisconnect={disconnect}
+                            />
+                            <NowPlaying
+                                track={currentTrack ?? null}
+                                coverArtUrl={coverArtUrl}
+                                isPlaying={isPlaying}
+                            />
+                            <PlayerControls
+                                isPlaying={isPlaying}
+                                currentTime={currentTime}
+                                duration={duration}
+                                volume={volume}
+                                repeatMode={repeatMode}
+                                shuffle={shuffle}
+                                disableControls={!currentTrack || isTrackLoading}
+                                onPlayPause={handlePlayPause}
+                                onPrevious={handlePrevious}
+                                onNext={handleNext}
+                                onSeek={handleSeek}
+                                onVolumeChange={handleVolumeChange}
+                                onToggleShuffle={handleToggleShuffle}
+                                onCycleRepeat={handleCycleRepeat}
+                            />
+                            {error ? <p className="error">{error}</p> : null}
+                        </aside>
+                    </>
+                ) : (
+                    <section className="app__main app__main--center">
                         <LoginForm
                             onSubmit={connect}
                             isLoading={isLoading}
                             error={error}
                             initialConfig={storedConfig}
                         />
-                    )}
-                </aside>
-                <section className="app__content">
-                    <NowPlaying track={currentTrack ?? null} coverArtUrl={coverArtUrl} isPlaying={isPlaying} />
-                    <PlayerControls
-                        isPlaying={isPlaying}
-                        currentTime={currentTime}
-                        duration={duration}
-                        volume={volume}
-                        repeatMode={repeatMode}
-                        shuffle={shuffle}
-                        disableControls={!currentTrack || isTrackLoading}
-                        onPlayPause={handlePlayPause}
-                        onPrevious={handlePrevious}
-                        onNext={handleNext}
-                        onSeek={handleSeek}
-                        onVolumeChange={handleVolumeChange}
-                        onToggleShuffle={handleToggleShuffle}
-                        onCycleRepeat={handleCycleRepeat}
-                    />
-                    {error ? <p className="error">{error}</p> : null}
-                </section>
+                    </section>
+                )}
             </main>
             <audio ref={audioRef} hidden preload="none" />
         </div>
