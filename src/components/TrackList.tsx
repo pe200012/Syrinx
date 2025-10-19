@@ -1,7 +1,9 @@
 import type { ChangeEvent, MouseEvent } from "react";
+import { useState } from "react";
 import type { Track } from "../types";
 import { humanFileSize } from "../services/webdavClient";
 import type { TrackSortDirection, TrackSortKey } from "../utils/tracks";
+import ContextMenu, { type MenuItem } from "./ContextMenu";
 import searchIcon from "@fluentui/svg-icons/icons/search_24_regular.svg";
 import refreshIcon from "@fluentui/svg-icons/icons/arrow_clockwise_24_regular.svg";
 import sortAscIcon from "@fluentui/svg-icons/icons/text_sort_ascending_20_filled.svg";
@@ -13,10 +15,20 @@ const sortableColumns: Array<{ key: TrackSortKey; label: string }> = [
     { key: "album", label: "Album" }
 ];
 
+export interface PlaylistOption {
+    id: string;
+    label: string;
+}
+
 export interface TrackListProps {
     tracks: Track[];
     currentTrackId: string | null;
     onSelectTrack: (track: Track) => void;
+    onRemoveFromPlaylist?: (playlistId: string, trackId: string) => void;
+    onAddToPlayNext?: (trackId: string) => void;
+    onAddToPlaylist?: (playlistId: string, trackId: string) => void;
+    playlists?: PlaylistOption[];
+    currentPlaylistId?: string;
     isLoading?: boolean;
     filterValue: string;
     onFilterChange: (value: string) => void;
@@ -31,6 +43,11 @@ export default function TrackList({
     tracks,
     currentTrackId,
     onSelectTrack,
+    onRemoveFromPlaylist,
+    onAddToPlayNext,
+    onAddToPlaylist,
+    playlists = [],
+    currentPlaylistId,
     isLoading,
     filterValue,
     onFilterChange,
@@ -40,11 +57,66 @@ export default function TrackList({
     onSortChange,
     title
 }: TrackListProps) {
+    const [contextMenu, setContextMenu] = useState<{
+        x: number;
+        y: number;
+        track: Track;
+    } | null>(null);
+
     const hasTracks = tracks.length > 0;
+    const canRemoveFromPlaylist = currentPlaylistId && currentPlaylistId !== "all" && onRemoveFromPlaylist;
 
     const handleSort = (event: MouseEvent<HTMLButtonElement>, key: TrackSortKey) => {
         event.preventDefault();
         onSortChange(key);
+    };
+
+    const handleContextMenu = (event: MouseEvent<HTMLTableRowElement>, track: Track) => {
+        event.preventDefault();
+        setContextMenu({
+            x: event.clientX,
+            y: event.clientY,
+            track
+        });
+    };
+
+    const handleCloseContextMenu = () => {
+        setContextMenu(null);
+    };
+
+    const getContextMenuItems = (track: Track): MenuItem[] => {
+        const items: MenuItem[] = [];
+
+        if (onAddToPlayNext) {
+            items.push({
+                label: "Add to Play Next Queue",
+                onClick: () => onAddToPlayNext(track.id)
+            });
+        }
+
+        if (canRemoveFromPlaylist) {
+            items.push({
+                label: "Remove from playlist",
+                onClick: () => onRemoveFromPlaylist(currentPlaylistId!, track.id)
+            });
+        }
+
+        if (onAddToPlaylist && playlists.length > 0) {
+            if (items.length > 0) {
+                items.push({ label: "", onClick: () => { }, separator: true });
+            }
+
+            const availablePlaylists = playlists.filter((p) => p.id !== "all" && p.id !== currentPlaylistId);
+
+            availablePlaylists.forEach((playlist) => {
+                items.push({
+                    label: `Add to "${playlist.label}"`,
+                    onClick: () => onAddToPlaylist(playlist.id, track.id)
+                });
+            });
+        }
+
+        return items;
     };
 
     return (
@@ -134,6 +206,7 @@ export default function TrackList({
                                     key={track.id}
                                     className={isActive ? "active" : undefined}
                                     onClick={() => onSelectTrack(track)}
+                                    onContextMenu={(e) => handleContextMenu(e, track)}
                                 >
                                     <td data-label="Title">
                                         <div>
@@ -159,6 +232,14 @@ export default function TrackList({
                     </tbody>
                 </table>
             </div>
+            {contextMenu && (
+                <ContextMenu
+                    x={contextMenu.x}
+                    y={contextMenu.y}
+                    items={getContextMenuItems(contextMenu.track)}
+                    onClose={handleCloseContextMenu}
+                />
+            )}
         </section>
     );
 }

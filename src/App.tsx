@@ -17,6 +17,14 @@ import {
 import { explainConnectionError } from "./utils/errors";
 
 const STORAGE_KEY = "webdav-music-player:connection";
+const PLAYLISTS_STORAGE_KEY = "webdav-music-player:playlists";
+
+interface UserPlaylist {
+    id: string;
+    name: string;
+    trackIds: string[];
+    createdAt: number;
+}
 
 function loadStoredConfig(): ConnectionConfig | null {
     if (typeof window === "undefined") return null;
@@ -63,18 +71,23 @@ function persistConfig(config: ConnectionConfig | null): ConnectionConfig | null
     };
 }
 
-function derivePlaylistGrouping(track: Track): { key: string; label: string } {
-    const album = track.metadata?.album?.trim();
-    if (album) {
-        return { key: `album::${album.toLowerCase()}`, label: album };
+function loadStoredPlaylists(): UserPlaylist[] {
+    if (typeof window === "undefined") return [];
+    try {
+        const stored = window.localStorage.getItem(PLAYLISTS_STORAGE_KEY);
+        return stored ? JSON.parse(stored) : [];
+    } catch {
+        return [];
     }
+}
 
-    const path = track.displayPath || track.name;
-    const parts = path.split("/").filter(Boolean);
-    const segment = parts.length > 1 ? parts[0] : "Loose tracks";
-    const label = segment.trim() || "Loose tracks";
-
-    return { key: `folder::${label.toLowerCase()}`, label };
+function saveStoredPlaylists(playlists: UserPlaylist[]): void {
+    if (typeof window === "undefined") return;
+    try {
+        window.localStorage.setItem(PLAYLISTS_STORAGE_KEY, JSON.stringify(playlists));
+    } catch (err) {
+        console.error("Failed to save playlists:", err);
+    }
 }
 
 export default function App() {
@@ -100,6 +113,8 @@ export default function App() {
     const [coverArtUrl, setCoverArtUrl] = useState<string | null>(null);
     const [sortOptions, setSortOptions] = useState<TrackSortOptions>({ key: "title", direction: "asc" });
     const [selectedPlaylistId, setSelectedPlaylistId] = useState<string>("all");
+    const [userPlaylists, setUserPlaylists] = useState<UserPlaylist[]>(() => loadStoredPlaylists());
+    const [playNextQueue, setPlayNextQueue] = useState<string[]>([]);
     const tracksRef = useRef<Track[]>(tracks);
     const pendingMetadataRef = useRef<Set<string>>(new Set());
     const metadataWorkerAbortRef = useRef<{ cancelled: boolean } | null>(null);
@@ -113,45 +128,22 @@ export default function App() {
     }
 
     const playlists: PlaylistInfo[] = useMemo(() => {
-        if (tracks.length === 0) {
-            return [
-                {
-                    id: "all",
-                    label: "All tracks",
-                    trackIds: [],
-                    count: 0
-                }
-            ];
-        }
+        const allTracks: PlaylistInfo = {
+            id: "all",
+            label: "All tracks",
+            trackIds: tracks.map((track) => track.id),
+            count: tracks.length
+        };
 
-        const groups = new Map<string, { label: string; trackIds: string[] }>();
-        tracks.forEach((track) => {
-            const { key, label } = derivePlaylistGrouping(track);
-            if (!groups.has(key)) {
-                groups.set(key, { label, trackIds: [] });
-            }
-            groups.get(key)!.trackIds.push(track.id);
-        });
+        const customPlaylists: PlaylistInfo[] = userPlaylists.map((playlist) => ({
+            id: playlist.id,
+            label: playlist.name,
+            trackIds: playlist.trackIds.filter((id) => tracks.some((t) => t.id === id)),
+            count: playlist.trackIds.filter((id) => tracks.some((t) => t.id === id)).length
+        }));
 
-        const groupEntries = Array.from(groups.entries())
-            .map(([key, value]) => ({
-                id: key,
-                label: value.label,
-                trackIds: value.trackIds,
-                count: value.trackIds.length
-            }))
-            .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
-
-        return [
-            {
-                id: "all",
-                label: "All tracks",
-                trackIds: tracks.map((track) => track.id),
-                count: tracks.length
-            },
-            ...groupEntries
-        ];
-    }, [tracks]);
+        return [allTracks, ...customPlaylists];
+    }, [tracks, userPlaylists]);
 
     useEffect(() => {
         if (playlists.length === 0) {
@@ -424,6 +416,15 @@ export default function App() {
     const advanceToNextTrack = useCallback(
         (auto = false) => {
             if (!visibleTracks.length) return;
+
+            // Check if there's a track in the play next queue
+            if (playNextQueue.length > 0) {
+                const nextTrackId = playNextQueue[0];
+                setPlayNextQueue((prev) => prev.slice(1));
+                setCurrentTrackId(nextTrackId);
+                return;
+            }
+
             const current = currentTrack ?? visibleTracks[0];
             const currentIndex = visibleTracks.findIndex(
                 (track: Track) => track.id === current.id
@@ -477,7 +478,7 @@ export default function App() {
                 setCurrentTrackId(nextTrack.id);
             }
         },
-        [visibleTracks, currentTrack, shuffle, repeatMode]
+        [visibleTracks, currentTrack, shuffle, repeatMode, playNextQueue]
     );
 
     const handlePrevious = useCallback(() => {
@@ -659,6 +660,60 @@ export default function App() {
         };
     }, [client, currentTrack, volume]);
 
+    const handleCreatePlaylist = useCallback((name: string) => {
+        const newPlaylist: UserPlaylist = {
+            id: `playlist-${Date.now()}`,
+            name,
+            trackIds: [],
+            createdAt: Date.now()
+        };
+        const updated = [...userPlaylists, newPlaylist];
+        setUserPlaylists(updated);
+        saveStoredPlaylists(updated);
+        setSelectedPlaylistId(newPlaylist.id);
+    }, [userPlaylists]);
+
+    const handleRenamePlaylist = useCallback((id: string, newName: string) => {
+        const updated = userPlaylists.map((p) =>
+            p.id === id ? { ...p, name: newName } : p
+        );
+        setUserPlaylists(updated);
+        saveStoredPlaylists(updated);
+    }, [userPlaylists]);
+
+    const handleDeletePlaylist = useCallback((id: string) => {
+        const updated = userPlaylists.filter((p) => p.id !== id);
+        setUserPlaylists(updated);
+        saveStoredPlaylists(updated);
+        if (selectedPlaylistId === id) {
+            setSelectedPlaylistId("all");
+        }
+    }, [userPlaylists, selectedPlaylistId]);
+
+    const handleAddToPlayNext = useCallback((trackId: string) => {
+        setPlayNextQueue((prev) => [...prev, trackId]);
+    }, []);
+
+    const handleAddToPlaylist = useCallback((playlistId: string, trackId: string) => {
+        const updated = userPlaylists.map((p) =>
+            p.id === playlistId && !p.trackIds.includes(trackId)
+                ? { ...p, trackIds: [...p.trackIds, trackId] }
+                : p
+        );
+        setUserPlaylists(updated);
+        saveStoredPlaylists(updated);
+    }, [userPlaylists]);
+
+    const handleRemoveFromPlaylist = useCallback((playlistId: string, trackId: string) => {
+        const updated = userPlaylists.map((p) =>
+            p.id === playlistId
+                ? { ...p, trackIds: p.trackIds.filter((id) => id !== trackId) }
+                : p
+        );
+        setUserPlaylists(updated);
+        saveStoredPlaylists(updated);
+    }, [userPlaylists]);
+
     const connected = client !== null && connection !== null;
 
     return (
@@ -699,6 +754,8 @@ export default function App() {
                                     playlists={playlistSummaries}
                                     selectedId={selectedPlaylistId}
                                     onSelect={handleSelectPlaylist}
+                                    onCreate={handleCreatePlaylist}
+                                    onDelete={handleDeletePlaylist}
                                     isLoading={isLoading}
                                 />
                             </aside>
@@ -715,6 +772,11 @@ export default function App() {
                                     sortDirection={sortOptions.direction}
                                     onSortChange={handleSortChange}
                                     title={selectedPlaylist?.label ?? "Songs"}
+                                    onRemoveFromPlaylist={handleRemoveFromPlaylist}
+                                    onAddToPlayNext={handleAddToPlayNext}
+                                    onAddToPlaylist={handleAddToPlaylist}
+                                    playlists={playlistSummaries}
+                                    currentPlaylistId={selectedPlaylistId}
                                 />
                             </section>
                         </div>
