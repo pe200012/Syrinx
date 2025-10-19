@@ -512,11 +512,19 @@ button.secondary:not(:disabled):hover {
 
 .player-controls {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    align-items: center;
     gap: var(--spacing-lg);
 }
 
-.player-controls__timeline,
+.player-controls__timeline {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    flex: 1;
+    min-width: 0;
+}
+
 .player-controls__buttons,
 .player-controls__volume {
     display: flex;
@@ -701,26 +709,26 @@ button.secondary:not(:disabled):hover {
 
 .volume-control__slider-box {
     position: absolute;
-    bottom: calc(100% + 14px);
+    bottom: calc(100% + 18px);
     left: 50%;
-    transform: translate(-50%, 12px);
+    transform: translate(-50%, 12px) scale(0.96);
     padding: 14px 18px;
     border-radius: var(--radius-medium);
     background: var(--color-surface);
-    border: 1px solid rgba(17, 94, 163, 0.16);
-    box-shadow: 0 16px 32px rgba(17, 94, 163, 0.25);
+    border: 1px solid var(--color-border-strong);
+    box-shadow: 0 18px 32px rgba(17, 94, 163, 0.2);
     opacity: 0;
     pointer-events: none;
-    transition: opacity 160ms ease, transform 200ms ease;
-    min-width: 180px;
-    z-index: 10;
+    transition: opacity 160ms ease, transform 220ms ease;
+    min-width: 200px;
+    z-index: 12;
 }
 
 .volume-control:not(.volume-control--disabled):hover .volume-control__slider-box,
 .volume-control:not(.volume-control--disabled):focus-within .volume-control__slider-box {
     opacity: 1;
     pointer-events: auto;
-    transform: translate(-50%, 0);
+    transform: translate(-50%, 0) scale(1);
 }
 
 .volume-control__slider {
@@ -728,6 +736,7 @@ button.secondary:not(:disabled):hover {
     background: transparent;
     appearance: none;
     -webkit-appearance: none;
+    height: 4px;
 }
 
 .volume-control__slider:focus-visible {
@@ -743,6 +752,57 @@ button.secondary:not(:disabled):hover {
 
 .volume-control--disabled .volume-control__slider-box {
     display: none;
+}
+
+.volume-control__slider::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(17, 94, 163, 0.15), rgba(17, 94, 163, 0.65));
+}
+
+.volume-control__slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--color-surface);
+    border: 2px solid var(--color-accent);
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
+    margin-top: -7px;
+    transition: transform 120ms ease, box-shadow 160ms ease;
+}
+
+.volume-control__slider::-webkit-slider-thumb:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 10px rgba(17, 94, 163, 0.35);
+}
+
+.volume-control__slider::-moz-range-track {
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(17, 94, 163, 0.15);
+}
+
+.volume-control__slider::-moz-range-progress {
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(17, 94, 163, 0.65);
+}
+
+.volume-control__slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--color-surface);
+    border: 2px solid var(--color-accent);
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
+    transition: transform 120ms ease, box-shadow 160ms ease;
+}
+
+.volume-control__slider::-moz-range-thumb:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 10px rgba(17, 94, 163, 0.35);
 }
 
 .now-playing {

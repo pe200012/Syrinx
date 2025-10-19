@@ -72,37 +72,6 @@ export default function PlayerControls({
 
     return (
         <div className="card player-controls">
-            <div className="player-controls__timeline">
-                <span>{formatTime(currentTime)}</span>
-                <div className={timelineClasses}>
-                    <div className="timeline-slider__track">
-                        <div
-                            className="timeline-slider__progress"
-                            style={{ width: `${progressPercent}%` }}
-                            aria-hidden="true"
-                        />
-                    </div>
-                    <div
-                        className="timeline-slider__thumb"
-                        style={{ left: `${progressPercent}%` }}
-                        aria-hidden="true"
-                    >
-                        <img src={timelineNoteIcon} alt="" aria-hidden className="timeline-slider__thumb-icon" />
-                    </div>
-                    <input
-                        type="range"
-                        min={0}
-                        max={safeDuration}
-                        step={1}
-                        value={safeCurrentTime}
-                        onChange={handleSeek}
-                        disabled={timelineDisabled}
-                        aria-label="Seek"
-                        className="timeline-slider__input"
-                    />
-                </div>
-                <span>{formatTime(duration)}</span>
-            </div>
             <div className="player-controls__buttons">
                 <button
                     type="button"
@@ -190,6 +159,37 @@ export default function PlayerControls({
                         />
                     </div>
                 </div>
+            </div>
+            <div className="player-controls__timeline">
+                <span>{formatTime(currentTime)}</span>
+                <div className={timelineClasses}>
+                    <div className="timeline-slider__track">
+                        <div
+                            className="timeline-slider__progress"
+                            style={{ width: `${progressPercent}%` }}
+                            aria-hidden="true"
+                        />
+                    </div>
+                    {/* <div
+                        className="timeline-slider__thumb"
+                        style={{ left: `${progressPercent}%` }}
+                        aria-hidden="true"
+                    >
+                        <img src={timelineNoteIcon} alt="" aria-hidden className="timeline-slider__thumb-icon" />
+                    </div> */}
+                    <input
+                        type="range"
+                        min={0}
+                        max={safeDuration}
+                        step={1}
+                        value={safeCurrentTime}
+                        onChange={handleSeek}
+                        disabled={timelineDisabled}
+                        aria-label="Seek"
+                        className="timeline-slider__input"
+                    />
+                </div>
+                <span>{formatTime(duration)}</span>
             </div>
         </div>
     );
