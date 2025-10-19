@@ -182,7 +182,7 @@ button {
     padding: 10px 20px;
     font-weight: 600;
     cursor: pointer;
-    transition: transform 0.1s ease, box-shadow 0.2s ease, background 0.2s ease, border 0.2s ease;
+    transition: transform 0.2s ease, box-shadow 0.3s ease, background 0.2s ease, border 0.2s ease;
 }
 
 button:focus-visible,
@@ -220,6 +220,96 @@ button.secondary {
 
 button.secondary:not(:disabled):hover {
     background: var(--color-surface-secondary);
+}
+
+.icon {
+    width: 24px;
+    height: 24px;
+    display: inline-flex;
+}
+
+.icon-button {
+    width: 52px;
+    height: 52px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    background: var(--color-surface-secondary);
+    border-color: transparent;
+    box-shadow: none;
+}
+
+.icon-button.primary {
+    background: var(--color-accent);
+}
+
+.icon-button.primary:not(:disabled):hover {
+    background: var(--color-accent-strong);
+}
+
+.icon-button.primary .icon {
+    filter: invert(1);
+}
+
+.icon-button .icon {
+    width: 26px;
+    height: 26px;
+}
+
+.icon-button.active {
+    background: var(--color-accent-soft);
+    color: var(--color-accent);
+}
+
+.icon-button__caption {
+    position: absolute;
+    bottom: -18px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--color-text-muted);
+}
+
+.button-with-icon {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: 10px 18px;
+}
+
+.button-with-icon .icon {
+    width: 20px;
+    height: 20px;
+}
+
+.spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.visually-hidden {
+    border: 0;
+    clip: rect(0 0 0 0);
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    padding: 0;
+    position: absolute;
+    width: 1px;
+    white-space: nowrap;
 }
 
 .checkbox {
@@ -273,6 +363,31 @@ button.secondary:not(:disabled):hover {
     min-width: 0;
 }
 
+.search-field {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: 6px 10px;
+    border-radius: var(--radius-medium);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-secondary);
+}
+
+.search-field input[type="search"] {
+    border: none;
+    background: transparent;
+    padding: 6px 8px;
+}
+
+.search-field input[type="search"]:focus {
+    box-shadow: none;
+}
+
+.search-field .icon {
+    width: 20px;
+    height: 20px;
+}
+
 .track-list__table {
     margin-top: var(--spacing-sm);
     border-radius: var(--radius-medium);
@@ -315,13 +430,19 @@ button.secondary:not(:disabled):hover {
     cursor: pointer;
 }
 
+.track-list__table button .icon {
+    width: 18px;
+    height: 18px;
+}
+
 .track-list__table tbody tr {
     cursor: pointer;
-    transition: background 0.15s ease;
+    transition: background 0.2s ease, transform 0.2s ease;
 }
 
 .track-list__table tbody tr:hover {
     background: var(--color-surface-secondary);
+    transform: translateX(4px);
 }
 
 .track-list__table tbody tr.active {
@@ -393,11 +514,13 @@ button.secondary:not(:disabled):hover {
 
 .player-controls__timeline input[type="range"] {
     flex: 1;
+    transition: filter 0.3s ease;
 }
 
 .player-controls__buttons {
     justify-content: center;
     flex-wrap: wrap;
+    gap: var(--spacing-md);
 }
 
 .player-controls__buttons button.active {
@@ -407,6 +530,26 @@ button.secondary:not(:disabled):hover {
 
 .player-controls__volume {
     justify-content: flex-end;
+}
+
+.volume-control {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: 8px 12px;
+    border-radius: var(--radius-medium);
+    background: var(--color-surface-secondary);
+    border: 1px solid var(--color-border);
+}
+
+.volume-control .icon {
+    width: 22px;
+    height: 22px;
+}
+
+.volume-control input[type="range"] {
+    width: 140px;
+    background: transparent;
 }
 
 .now-playing {
@@ -426,6 +569,14 @@ button.secondary:not(:disabled):hover {
 
 .now-playing__art.placeholder {
     display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.now-playing__art.placeholder .icon {
+    width: 64px;
+    height: 64px;
+    opacity: 0.4;
 }
 
 .now-playing__meta h3 {
@@ -438,11 +589,40 @@ button.secondary:not(:disabled):hover {
 }
 
 .now-playing__status {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xs);
     color: var(--color-accent);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     font-size: 0.75rem;
+}
+
+.now-playing__status .icon {
+    width: 20px;
+    height: 20px;
+}
+
+.now-playing__status--playing {
+    animation: pulse 1.6s ease-in-out infinite alternate;
+}
+
+@keyframes pulse {
+    from {
+        opacity: 0.7;
+        transform: scale(0.97);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1.03);
+    }
+}
+
+.connection-card__actions .icon {
+    width: 20px;
+    height: 20px;
 }
 
 .connection-card dl {
@@ -465,4 +645,26 @@ button.secondary:not(:disabled):hover {
     justify-content: space-between;
     gap: 12px;
     margin-top: 16px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+
+    .track-list__table tbody tr:hover {
+        transform: none;
+    }
+
+    .icon-button,
+    button,
+    .button-with-icon {
+        transform: none !important;
+    }
 }

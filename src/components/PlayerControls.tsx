@@ -1,5 +1,15 @@
 import type { ChangeEvent } from "react";
 import { formatTime } from "../utils/time";
+import shuffleFilled from "@fluentui/svg-icons/icons/arrow_shuffle_24_filled.svg";
+import shuffleRegular from "@fluentui/svg-icons/icons/arrow_shuffle_24_regular.svg";
+import previousIcon from "@fluentui/svg-icons/icons/previous_24_regular.svg";
+import nextIcon from "@fluentui/svg-icons/icons/next_24_regular.svg";
+import playIcon from "@fluentui/svg-icons/icons/play_24_filled.svg";
+import pauseIcon from "@fluentui/svg-icons/icons/pause_24_filled.svg";
+import repeatAllIcon from "@fluentui/svg-icons/icons/arrow_repeat_all_24_filled.svg";
+import repeatOneIcon from "@fluentui/svg-icons/icons/arrow_repeat_1_24_filled.svg";
+import repeatOffIcon from "@fluentui/svg-icons/icons/arrow_repeat_all_off_24_regular.svg";
+import volumeIcon from "@fluentui/svg-icons/icons/speaker_2_24_regular.svg";
 
 export type RepeatMode = "off" | "all" | "one";
 
@@ -56,29 +66,74 @@ export default function PlayerControls({
                     value={Number.isFinite(currentTime) ? Math.min(currentTime, duration) : 0}
                     onChange={handleSeek}
                     disabled={disableControls || !Number.isFinite(duration) || duration === 0}
+                    aria-label="Seek"
                 />
                 <span>{formatTime(duration)}</span>
             </div>
             <div className="player-controls__buttons">
-                <button type="button" onClick={onToggleShuffle} className={shuffle ? "active" : ""}>
-                    Shuffle
+                <button
+                    type="button"
+                    onClick={onToggleShuffle}
+                    className={`icon-button ${shuffle ? "active" : ""}`}
+                    aria-pressed={shuffle}
+                    aria-label={shuffle ? "Disable shuffle" : "Enable shuffle"}
+                    title={shuffle ? "Shuffle enabled" : "Shuffle"}
+                >
+                    <img src={shuffle ? shuffleFilled : shuffleRegular} alt="" aria-hidden className="icon" />
                 </button>
-                <button type="button" onClick={onPrevious} disabled={disableControls}>
-                    Prev
+                <button
+                    type="button"
+                    onClick={onPrevious}
+                    disabled={disableControls}
+                    className="icon-button"
+                    aria-label="Previous track"
+                    title="Previous"
+                >
+                    <img src={previousIcon} alt="" aria-hidden className="icon" />
                 </button>
-                <button type="button" onClick={onPlayPause} disabled={disableControls} className="primary">
-                    {isPlaying ? "Pause" : "Play"}
+                <button
+                    type="button"
+                    onClick={onPlayPause}
+                    disabled={disableControls}
+                    className="icon-button primary"
+                    aria-label={isPlaying ? "Pause playback" : "Start playback"}
+                    title={isPlaying ? "Pause" : "Play"}
+                >
+                    <img src={isPlaying ? pauseIcon : playIcon} alt="" aria-hidden className="icon" />
                 </button>
-                <button type="button" onClick={onNext} disabled={disableControls}>
-                    Next
+                <button
+                    type="button"
+                    onClick={onNext}
+                    disabled={disableControls}
+                    className="icon-button"
+                    aria-label="Next track"
+                    title="Next"
+                >
+                    <img src={nextIcon} alt="" aria-hidden className="icon" />
                 </button>
-                <button type="button" onClick={onCycleRepeat} className={repeatMode !== "off" ? "active" : ""}>
-                    Repeat: {repeatMode === "off" ? "Off" : repeatMode === "all" ? "All" : "One"}
+                <button
+                    type="button"
+                    onClick={onCycleRepeat}
+                    className={`icon-button ${repeatMode !== "off" ? "active" : ""}`}
+                    aria-pressed={repeatMode !== "off"}
+                    aria-label={`Cycle repeat mode (currently ${repeatMode})`}
+                    title={`Repeat: ${repeatMode === "off" ? "Off" : repeatMode === "all" ? "All" : "One"}`}
+                >
+                    <img
+                        src={repeatMode === "one" ? repeatOneIcon : repeatMode === "all" ? repeatAllIcon : repeatOffIcon}
+                        alt=""
+                        aria-hidden
+                        className="icon"
+                    />
+                    <span className="icon-button__caption">
+                        {repeatMode === "off" ? "Off" : repeatMode === "all" ? "All" : "One"}
+                    </span>
                 </button>
             </div>
             <div className="player-controls__volume">
-                <label>
-                    Volume
+                <label className="volume-control">
+                    <img src={volumeIcon} alt="" aria-hidden className="icon" />
+                    <span className="visually-hidden">Volume</span>
                     <input
                         type="range"
                         min={0}
@@ -86,6 +141,7 @@ export default function PlayerControls({
                         step={0.01}
                         value={volume}
                         onChange={handleVolume}
+                        aria-label="Volume"
                     />
                 </label>
             </div>

@@ -2,6 +2,10 @@ import type { ChangeEvent, MouseEvent } from "react";
 import type { Track } from "../types";
 import { humanFileSize } from "../services/webdavClient";
 import type { TrackSortDirection, TrackSortKey } from "../utils/tracks";
+import searchIcon from "@fluentui/svg-icons/icons/search_24_regular.svg";
+import refreshIcon from "@fluentui/svg-icons/icons/arrow_clockwise_24_regular.svg";
+import sortAscIcon from "@fluentui/svg-icons/icons/text_sort_ascending_20_filled.svg";
+import sortDescIcon from "@fluentui/svg-icons/icons/text_sort_descending_20_filled.svg";
 
 const sortableColumns: Array<{ key: TrackSortKey; label: string }> = [
     { key: "title", label: "Title" },
@@ -46,16 +50,33 @@ export default function TrackList({
             <header className="track-list__header">
                 <h2>Library</h2>
                 <div className="track-list__actions">
-                    <input
-                        type="search"
-                        placeholder="Search tracks"
-                        value={filterValue}
-                        onChange={(event: ChangeEvent<HTMLInputElement>) =>
-                            onFilterChange(event.target.value)
-                        }
-                    />
-                    <button type="button" onClick={onRefresh} disabled={isLoading}>
-                        Refresh
+                    <label className="search-field">
+                        <img src={searchIcon} alt="" aria-hidden className="icon" />
+                        <span className="visually-hidden">Search tracks</span>
+                        <input
+                            type="search"
+                            placeholder="Search tracks"
+                            value={filterValue}
+                            onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                                onFilterChange(event.target.value)
+                            }
+                            aria-label="Search tracks"
+                        />
+                    </label>
+                    <button
+                        type="button"
+                        onClick={onRefresh}
+                        disabled={isLoading}
+                        className="button-with-icon"
+                        title="Refresh library"
+                    >
+                        <img
+                            src={refreshIcon}
+                            alt=""
+                            aria-hidden
+                            className={`icon ${isLoading ? "spin" : ""}`}
+                        />
+                        <span>{isLoading ? "Syncing…" : "Refresh"}</span>
                     </button>
                 </div>
             </header>
@@ -67,7 +88,6 @@ export default function TrackList({
                         <tr>
                             {sortableColumns.map(({ key, label }) => {
                                 const isActive = key === sortKey;
-                                const indicator = isActive ? (sortDirection === "asc" ? "▲" : "▼") : "";
                                 return (
                                     <th
                                         key={key}
@@ -81,7 +101,14 @@ export default function TrackList({
                                     >
                                         <button type="button" onClick={(event) => handleSort(event, key)}>
                                             <span>{label}</span>
-                                            {indicator ? <span aria-hidden>{indicator}</span> : null}
+                                            {isActive ? (
+                                                <img
+                                                    src={sortDirection === "asc" ? sortAscIcon : sortDescIcon}
+                                                    alt=""
+                                                    aria-hidden
+                                                    className="icon"
+                                                />
+                                            ) : null}
                                         </button>
                                     </th>
                                 );

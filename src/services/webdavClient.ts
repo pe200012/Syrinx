@@ -1,5 +1,5 @@
 import { createClient, FileStat, WebDAVClient } from "webdav";
-import { parseBlob } from "music-metadata-browser";
+import { parseBlob } from "music-metadata";
 import type { Track, TrackMetadata, WebDavConnection } from "../types";
 
 const AUDIO_EXTENSIONS = new Set([

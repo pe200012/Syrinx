@@ -1,4 +1,7 @@
 import type { ConnectionConfig } from "../types";
+import refreshIcon from "@fluentui/svg-icons/icons/arrow_clockwise_24_regular.svg";
+import disconnectIcon from "@fluentui/svg-icons/icons/plug_disconnected_24_regular.svg";
+import spinnerIcon from "@fluentui/svg-icons/icons/spinner_ios_20_regular.svg";
 
 export interface ConnectionCardProps {
     connection: ConnectionConfig;
@@ -33,11 +36,28 @@ export default function ConnectionCard({
                 </div>
             </dl>
             <div className="connection-card__actions">
-                <button type="button" onClick={onRefresh} disabled={isLoading}>
-                    {isLoading ? "Syncing…" : "Refresh"}
+                <button
+                    type="button"
+                    onClick={onRefresh}
+                    disabled={isLoading}
+                    className="button-with-icon"
+                    aria-busy={isLoading}
+                >
+                    <img
+                        src={isLoading ? spinnerIcon : refreshIcon}
+                        alt=""
+                        aria-hidden
+                        className={`icon ${isLoading ? "spin" : ""}`}
+                    />
+                    <span>{isLoading ? "Syncing…" : "Refresh"}</span>
                 </button>
-                <button type="button" className="secondary" onClick={onDisconnect}>
-                    Disconnect
+                <button
+                    type="button"
+                    className="secondary button-with-icon"
+                    onClick={onDisconnect}
+                >
+                    <img src={disconnectIcon} alt="" aria-hidden className="icon" />
+                    <span>Disconnect</span>
                 </button>
             </div>
         </section>

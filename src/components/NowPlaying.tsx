@@ -1,5 +1,8 @@
 import type { Track } from "../types";
 import { humanFileSize } from "../services/webdavClient";
+import playingIcon from "@fluentui/svg-icons/icons/play_circle_24_filled.svg";
+import pausedIcon from "@fluentui/svg-icons/icons/pause_circle_24_regular.svg";
+import musicPlaceholder from "@fluentui/svg-icons/icons/music_note_2_24_regular.svg";
 
 export interface NowPlayingProps {
     track: Track | null;
@@ -21,16 +24,25 @@ export default function NowPlaying({ track, coverArtUrl, isPlaying }: NowPlaying
     const album = track.metadata?.album?.trim() || "Unknown album";
     const shouldShowFilename = !track.metadata?.title;
     const size = track.size ? humanFileSize(track.size) : "";
+    const statusIcon = isPlaying ? playingIcon : pausedIcon;
 
     return (
         <section className="card now-playing">
             {coverArtUrl ? (
                 <img src={coverArtUrl} alt={track.name} className="now-playing__art" />
             ) : (
-                <div className="now-playing__art placeholder" aria-hidden />
+                <div className="now-playing__art placeholder" aria-hidden>
+                    <img src={musicPlaceholder} alt="" aria-hidden className="icon" />
+                </div>
             )}
             <div className="now-playing__meta">
-                <span className="now-playing__status">{isPlaying ? "Now playing" : "Paused"}</span>
+                <span
+                    className={`now-playing__status ${isPlaying ? "now-playing__status--playing" : ""}`}
+                    aria-live="polite"
+                >
+                    <img src={statusIcon} alt="" aria-hidden className="icon" />
+                    <span>{isPlaying ? "Now playing" : "Paused"}</span>
+                </span>
                 <h3>{title}</h3>
                 <p>{artist}</p>
                 <p className="muted">{album}</p>
