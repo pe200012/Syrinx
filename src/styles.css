@@ -853,16 +853,29 @@ button.secondary:not(:disabled):hover {
 .now-playing__body {
     display: flex;
     flex-direction: column;
+    gap: var(--spacing-lg);
+}
+
+.now-playing__meta {
+    display: flex;
+    flex-direction: column;
     gap: var(--spacing-sm);
 }
 
-.now-playing__body>* {
+.now-playing__meta>* {
     margin: 0;
 }
 
 .now-playing__title {
     font-size: 1.4rem;
     margin: 0;
+}
+
+/* horizontal alignment */
+.now-playing__artist-album {
+    display: flex;
+    gap: var(--spacing-sm);
+    align-items: center;
 }
 
 .now-playing__artist,
@@ -884,6 +897,25 @@ button.secondary:not(:disabled):hover {
 
 .now-playing__controls {
     margin-top: var(--spacing-md);
+    width: 100%;
+}
+
+@media (min-width: 900px) {
+    .now-playing--hero .now-playing__body {
+        flex-direction: row;
+        align-items: flex-start;
+        gap: var(--spacing-xl);
+    }
+
+    .now-playing__meta {
+        flex: 0 0 320px;
+    }
+
+    .now-playing__controls {
+        margin-top: 0;
+        flex: 1;
+        min-width: 0;
+    }
 }
 
 .playlist-list {

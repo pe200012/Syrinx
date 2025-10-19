@@ -40,21 +40,22 @@ export default function NowPlaying({ track, coverArtUrl, isPlaying, children }: 
                 )}
             </div>
             <div className="now-playing__body">
-                <span
-                    className={`now-playing__status ${isPlaying ? "now-playing__status--playing" : ""}`}
-                    aria-live="polite"
-                >
-                    <img src={statusIcon} alt="" aria-hidden className="icon" />
-                    <span>{isPlaying ? "Now playing" : "Paused"}</span>
-                </span>
-                <h2 className="now-playing__title">{title}</h2>
-                <p className="now-playing__artist">{artist}</p>
-                <p className="now-playing__album">{album}</p>
-                {shouldShowFilename ? <p className="muted">{track.name}</p> : null}
-                <p className="muted">
-                    {track.contentType ?? "Unknown type"}
-                    {size ? ` · ${size}` : ""}
-                </p>
+                <div className="now-playing__meta">
+                    <span
+                        className={`now-playing__status ${isPlaying ? "now-playing__status--playing" : ""}`}
+                        aria-live="polite"
+                    >
+                        <img src={statusIcon} alt="" aria-hidden className="icon" />
+                        <span>{isPlaying ? "Now playing" : "Paused"}</span>
+                    </span>
+                    <h2 className="now-playing__title">{title}</h2>
+                    <div className="now-playing__artist-album">
+                        <p className="now-playing__artist">{artist}</p>
+                        <p>·</p>
+                        <p className="now-playing__album">{album}</p>
+                        {shouldShowFilename ? <p className="muted">{track.name}</p> : null}
+                    </div>
+                </div>
                 {children ? <div className="now-playing__controls">{children}</div> : null}
             </div>
         </section>
