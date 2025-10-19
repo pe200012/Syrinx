@@ -160,6 +160,9 @@ p {
 .app__playlists {
     position: sticky;
     top: 150px;
+    max-height: calc(100vh - 174px);
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .app__error {
