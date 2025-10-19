@@ -194,13 +194,9 @@ export default function App() {
     );
 
     const currentTrack = useMemo(() => {
-        if (!currentTrackId) {
-            return visibleTracks[0] ?? null;
-        }
         return (
             visibleTracks.find((track: Track) => track.id === currentTrackId) ??
             tracks.find((track: Track) => track.id === currentTrackId) ??
-            visibleTracks[0] ??
             null
         );
     }, [currentTrackId, visibleTracks, tracks]);
@@ -214,7 +210,7 @@ export default function App() {
             if (prev && visibleTracks.some((track) => track.id === prev)) {
                 return prev;
             }
-            return visibleTracks[0].id;
+            return null;
         });
     }, [visibleTracks]);
 
@@ -256,7 +252,6 @@ export default function App() {
                 setClient(clientInstance);
                 setConnection(config);
                 setTracks(sorted);
-                setCurrentTrackId(sorted[0]?.id ?? null);
                 setFilter("");
                 setSelectedPlaylistId("all");
                 const stored = config.remember ? persistConfig(config) : persistConfig(null);
