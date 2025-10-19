@@ -1,4 +1,4 @@
-import type { ChangeEvent } from "react";
+import { useId, type ChangeEvent } from "react";
 import { formatTime } from "../utils/time";
 import shuffleFilled from "@fluentui/svg-icons/icons/arrow_shuffle_24_filled.svg";
 import shuffleRegular from "@fluentui/svg-icons/icons/arrow_shuffle_24_regular.svg";
@@ -10,6 +10,7 @@ import repeatAllIcon from "@fluentui/svg-icons/icons/arrow_repeat_all_24_filled.
 import repeatOneIcon from "@fluentui/svg-icons/icons/arrow_repeat_1_24_filled.svg";
 import repeatOffIcon from "@fluentui/svg-icons/icons/arrow_repeat_all_off_24_regular.svg";
 import volumeIcon from "@fluentui/svg-icons/icons/speaker_2_24_regular.svg";
+import timelineNoteIcon from "@fluentui/svg-icons/icons/music_note_2_24_filled.svg";
 
 export type RepeatMode = "off" | "all" | "one";
 
@@ -54,20 +55,52 @@ export default function PlayerControls({
         onVolumeChange(Number(event.target.value));
     };
 
+    const hasDuration = Number.isFinite(duration) && duration > 0;
+    const safeDuration = hasDuration ? duration : 0;
+    const safeCurrentTime = hasDuration && Number.isFinite(currentTime) ? Math.min(currentTime, safeDuration) : 0;
+    const progressPercent = hasDuration ? Math.min((safeCurrentTime / safeDuration) * 100, 100) : 0;
+    const timelineDisabled = disableControls || !hasDuration;
+    const timelineClasses = [
+        "timeline-slider",
+        isPlaying && !timelineDisabled ? "timeline-slider--active" : "",
+        timelineDisabled ? "timeline-slider--disabled" : ""
+    ]
+        .filter(Boolean)
+        .join(" ");
+
+    const volumeSliderId = useId();
+
     return (
         <div className="card player-controls">
             <div className="player-controls__timeline">
                 <span>{formatTime(currentTime)}</span>
-                <input
-                    type="range"
-                    min={0}
-                    max={duration || 0}
-                    step={1}
-                    value={Number.isFinite(currentTime) ? Math.min(currentTime, duration) : 0}
-                    onChange={handleSeek}
-                    disabled={disableControls || !Number.isFinite(duration) || duration === 0}
-                    aria-label="Seek"
-                />
+                <div className={timelineClasses}>
+                    <div className="timeline-slider__track">
+                        <div
+                            className="timeline-slider__progress"
+                            style={{ width: `${progressPercent}%` }}
+                            aria-hidden="true"
+                        />
+                    </div>
+                    <div
+                        className="timeline-slider__thumb"
+                        style={{ left: `${progressPercent}%` }}
+                        aria-hidden="true"
+                    >
+                        <img src={timelineNoteIcon} alt="" aria-hidden className="timeline-slider__thumb-icon" />
+                    </div>
+                    <input
+                        type="range"
+                        min={0}
+                        max={safeDuration}
+                        step={1}
+                        value={safeCurrentTime}
+                        onChange={handleSeek}
+                        disabled={timelineDisabled}
+                        aria-label="Seek"
+                        className="timeline-slider__input"
+                    />
+                </div>
                 <span>{formatTime(duration)}</span>
             </div>
             <div className="player-controls__buttons">
@@ -129,21 +162,34 @@ export default function PlayerControls({
                         {repeatMode === "off" ? "Off" : repeatMode === "all" ? "All" : "One"}
                     </span>
                 </button>
-            </div>
-            <div className="player-controls__volume">
-                <label className="volume-control">
-                    <img src={volumeIcon} alt="" aria-hidden className="icon" />
-                    <span className="visually-hidden">Volume</span>
-                    <input
-                        type="range"
-                        min={0}
-                        max={1}
-                        step={0.01}
-                        value={volume}
-                        onChange={handleVolume}
-                        aria-label="Volume"
-                    />
-                </label>
+                <div className={`volume-control ${disableControls ? "volume-control--disabled" : ""}`}>
+                    <button
+                        type="button"
+                        className="icon-button volume-control__button"
+                        aria-haspopup="true"
+                        aria-controls={volumeSliderId}
+                        aria-label="Adjust volume"
+                        disabled={disableControls}
+                    >
+                        <img src={volumeIcon} alt="" aria-hidden className="icon" />
+                    </button>
+                    <div className="volume-control__slider-box">
+                        <label className="visually-hidden" htmlFor={volumeSliderId}>
+                            Volume
+                        </label>
+                        <input
+                            id={volumeSliderId}
+                            className="volume-control__slider"
+                            type="range"
+                            min={0}
+                            max={1}
+                            step={0.01}
+                            value={volume}
+                            onChange={handleVolume}
+                            disabled={disableControls}
+                        />
+                    </div>
+                </div>
             </div>
         </div>
     );

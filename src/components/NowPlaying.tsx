@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { Track } from "../types";
 import { humanFileSize } from "../services/webdavClient";
 import playingIcon from "@fluentui/svg-icons/icons/play_circle_24_filled.svg";
@@ -8,12 +9,13 @@ export interface NowPlayingProps {
     track: Track | null;
     coverArtUrl: string | null;
     isPlaying: boolean;
+    children?: ReactNode;
 }
 
-export default function NowPlaying({ track, coverArtUrl, isPlaying }: NowPlayingProps) {
+export default function NowPlaying({ track, coverArtUrl, isPlaying, children }: NowPlayingProps) {
     if (!track) {
         return (
-            <section className="card now-playing">
+            <section className="card now-playing now-playing--empty">
                 <p className="muted">Choose a track to start listening.</p>
             </section>
         );
@@ -27,15 +29,17 @@ export default function NowPlaying({ track, coverArtUrl, isPlaying }: NowPlaying
     const statusIcon = isPlaying ? playingIcon : pausedIcon;
 
     return (
-        <section className="card now-playing">
-            {coverArtUrl ? (
-                <img src={coverArtUrl} alt={track.name} className="now-playing__art" />
-            ) : (
-                <div className="now-playing__art placeholder" aria-hidden>
-                    <img src={musicPlaceholder} alt="" aria-hidden className="icon" />
-                </div>
-            )}
-            <div className="now-playing__meta">
+        <section className="card now-playing now-playing--hero">
+            <div className="now-playing__art-shell">
+                {coverArtUrl ? (
+                    <img src={coverArtUrl} alt={track.name} className="now-playing__art" />
+                ) : (
+                    <div className="now-playing__art placeholder" aria-hidden>
+                        <img src={musicPlaceholder} alt="" aria-hidden className="icon" />
+                    </div>
+                )}
+            </div>
+            <div className="now-playing__body">
                 <span
                     className={`now-playing__status ${isPlaying ? "now-playing__status--playing" : ""}`}
                     aria-live="polite"
@@ -43,14 +47,15 @@ export default function NowPlaying({ track, coverArtUrl, isPlaying }: NowPlaying
                     <img src={statusIcon} alt="" aria-hidden className="icon" />
                     <span>{isPlaying ? "Now playing" : "Paused"}</span>
                 </span>
-                <h3>{title}</h3>
-                <p>{artist}</p>
-                <p className="muted">{album}</p>
+                <h2 className="now-playing__title">{title}</h2>
+                <p className="now-playing__artist">{artist}</p>
+                <p className="now-playing__album">{album}</p>
                 {shouldShowFilename ? <p className="muted">{track.name}</p> : null}
                 <p className="muted">
                     {track.contentType ?? "Unknown type"}
                     {size ? ` · ${size}` : ""}
                 </p>
+                {children ? <div className="now-playing__controls">{children}</div> : null}
             </div>
         </section>
     );

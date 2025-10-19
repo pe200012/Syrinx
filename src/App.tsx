@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ConnectionCard from "./components/ConnectionCard";
 import LoginForm from "./components/LoginForm";
 import NowPlaying from "./components/NowPlaying";
+import PlaylistList from "./components/PlaylistList";
 import PlayerControls, { type RepeatMode } from "./components/PlayerControls";
 import TrackList from "./components/TrackList";
 import type { ConnectionConfig, Track, TrackMetadata } from "./types";
@@ -61,6 +62,20 @@ function persistConfig(config: ConnectionConfig | null): ConnectionConfig | null
     };
 }
 
+function derivePlaylistGrouping(track: Track): { key: string; label: string } {
+    const album = track.metadata?.album?.trim();
+    if (album) {
+        return { key: `album::${album.toLowerCase()}`, label: album };
+    }
+
+    const path = track.displayPath || track.name;
+    const parts = path.split("/").filter(Boolean);
+    const segment = parts.length > 1 ? parts[0] : "Loose tracks";
+    const label = segment.trim() || "Loose tracks";
+
+    return { key: `folder::${label.toLowerCase()}`, label };
+}
+
 export default function App() {
     const audioRef = useRef<HTMLAudioElement>(null);
 
@@ -83,14 +98,99 @@ export default function App() {
     const [repeatMode, setRepeatMode] = useState<RepeatMode>("off");
     const [coverArtUrl, setCoverArtUrl] = useState<string | null>(null);
     const [sortOptions, setSortOptions] = useState<TrackSortOptions>({ key: "title", direction: "asc" });
+    const [selectedPlaylistId, setSelectedPlaylistId] = useState<string>("all");
     const tracksRef = useRef<Track[]>(tracks);
     const pendingMetadataRef = useRef<Set<string>>(new Set());
     const metadataWorkerAbortRef = useRef<{ cancelled: boolean } | null>(null);
     const metadataWorkerRunningRef = useRef(false);
 
+    interface PlaylistInfo {
+        id: string;
+        label: string;
+        trackIds: string[];
+        count: number;
+    }
+
+    const playlists: PlaylistInfo[] = useMemo(() => {
+        if (tracks.length === 0) {
+            return [
+                {
+                    id: "all",
+                    label: "All tracks",
+                    trackIds: [],
+                    count: 0
+                }
+            ];
+        }
+
+        const groups = new Map<string, { label: string; trackIds: string[] }>();
+        tracks.forEach((track) => {
+            const { key, label } = derivePlaylistGrouping(track);
+            if (!groups.has(key)) {
+                groups.set(key, { label, trackIds: [] });
+            }
+            groups.get(key)!.trackIds.push(track.id);
+        });
+
+        const groupEntries = Array.from(groups.entries())
+            .map(([key, value]) => ({
+                id: key,
+                label: value.label,
+                trackIds: value.trackIds,
+                count: value.trackIds.length
+            }))
+            .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
+
+        return [
+            {
+                id: "all",
+                label: "All tracks",
+                trackIds: tracks.map((track) => track.id),
+                count: tracks.length
+            },
+            ...groupEntries
+        ];
+    }, [tracks]);
+
+    useEffect(() => {
+        if (playlists.length === 0) {
+            return;
+        }
+        if (!playlists.some((playlist) => playlist.id === selectedPlaylistId)) {
+            setSelectedPlaylistId(playlists[0].id);
+        }
+    }, [playlists, selectedPlaylistId]);
+
+    const playlistFilteredTracks = useMemo(() => {
+        if (selectedPlaylistId === "all") {
+            return tracks;
+        }
+        const playlist = playlists.find((candidate) => candidate.id === selectedPlaylistId);
+        if (!playlist) {
+            return tracks;
+        }
+        const trackSet = new Set(playlist.trackIds);
+        return tracks.filter((track) => trackSet.has(track.id));
+    }, [tracks, playlists, selectedPlaylistId]);
+
+    const filteredTracks = useMemo(
+        () => filterTracks(playlistFilteredTracks, filter),
+        [playlistFilteredTracks, filter]
+    );
+
     const visibleTracks = useMemo(
-        () => sortTracks(filterTracks(tracks, filter), sortOptions),
-        [tracks, filter, sortOptions]
+        () => sortTracks(filteredTracks, sortOptions),
+        [filteredTracks, sortOptions]
+    );
+
+    const playlistSummaries = useMemo(
+        () => playlists.map((playlist) => ({ id: playlist.id, label: playlist.label, count: playlist.count })),
+        [playlists]
+    );
+
+    const selectedPlaylist = useMemo(
+        () => playlists.find((playlist) => playlist.id === selectedPlaylistId) ?? playlists[0],
+        [playlists, selectedPlaylistId]
     );
 
     const currentTrack = useMemo(() => {
@@ -106,10 +206,17 @@ export default function App() {
     }, [currentTrackId, visibleTracks, tracks]);
 
     useEffect(() => {
-        if (!currentTrackId && visibleTracks.length > 0) {
-            setCurrentTrackId(visibleTracks[0].id);
+        if (visibleTracks.length === 0) {
+            setCurrentTrackId(null);
+            return;
         }
-    }, [currentTrackId, visibleTracks]);
+        setCurrentTrackId((prev) => {
+            if (prev && visibleTracks.some((track) => track.id === prev)) {
+                return prev;
+            }
+            return visibleTracks[0].id;
+        });
+    }, [visibleTracks]);
 
     useEffect(() => {
         if (audioRef.current) {
@@ -126,6 +233,7 @@ export default function App() {
         setIsPlaying(false);
         setCurrentTime(0);
         setDuration(0);
+        setSelectedPlaylistId("all");
         const audio = audioRef.current;
         if (audio) {
             audio.pause();
@@ -150,6 +258,7 @@ export default function App() {
                 setTracks(sorted);
                 setCurrentTrackId(sorted[0]?.id ?? null);
                 setFilter("");
+                setSelectedPlaylistId("all");
                 const stored = config.remember ? persistConfig(config) : persistConfig(null);
                 setStoredConfig(stored);
             } catch (err) {
@@ -458,6 +567,11 @@ export default function App() {
         });
     }, []);
 
+    const handleSelectPlaylist = useCallback((playlistId: string) => {
+        setSelectedPlaylistId(playlistId);
+        setFilter("");
+    }, []);
+
     useEffect(() => {
         const audio = audioRef.current;
         if (!audio) return;
@@ -549,64 +663,63 @@ export default function App() {
         };
     }, [client, currentTrack, volume]);
 
-    const connected = client && connection;
+    const connected = client !== null && connection !== null;
 
     return (
         <div className="app">
-            <header className="app__header">
-                <div>
-                    <h1>WebDAV Music Player</h1>
-                    <p className="muted">Stream your audio library securely from any WebDAV server.</p>
-                </div>
-            </header>
             <main className={`app__layout ${connected ? "app__layout--connected" : "app__layout--auth"}`}>
                 {connected ? (
                     <>
-                        <section className="app__main">
-                            <TrackList
-                                tracks={visibleTracks}
-                                currentTrackId={currentTrack?.id ?? null}
-                                onSelectTrack={handleSelectTrack}
-                                isLoading={isLoading}
-                                filterValue={filter}
-                                onFilterChange={setFilter}
-                                onRefresh={refreshTracks}
-                                sortKey={sortOptions.key}
-                                sortDirection={sortOptions.direction}
-                                onSortChange={handleSortChange}
-                            />
-                        </section>
-                        <aside className="app__sidebar">
-                            <ConnectionCard
-                                connection={connection}
-                                trackCount={tracks.length}
-                                isLoading={isLoading}
-                                onRefresh={refreshTracks}
-                                onDisconnect={disconnect}
-                            />
+                        <div className="app__hero">
                             <NowPlaying
                                 track={currentTrack ?? null}
                                 coverArtUrl={coverArtUrl}
                                 isPlaying={isPlaying}
-                            />
-                            <PlayerControls
-                                isPlaying={isPlaying}
-                                currentTime={currentTime}
-                                duration={duration}
-                                volume={volume}
-                                repeatMode={repeatMode}
-                                shuffle={shuffle}
-                                disableControls={!currentTrack || isTrackLoading}
-                                onPlayPause={handlePlayPause}
-                                onPrevious={handlePrevious}
-                                onNext={handleNext}
-                                onSeek={handleSeek}
-                                onVolumeChange={handleVolumeChange}
-                                onToggleShuffle={handleToggleShuffle}
-                                onCycleRepeat={handleCycleRepeat}
-                            />
-                            {error ? <p className="error">{error}</p> : null}
-                        </aside>
+                            >
+                                <PlayerControls
+                                    isPlaying={isPlaying}
+                                    currentTime={currentTime}
+                                    duration={duration}
+                                    volume={volume}
+                                    repeatMode={repeatMode}
+                                    shuffle={shuffle}
+                                    disableControls={!currentTrack || isTrackLoading}
+                                    onPlayPause={handlePlayPause}
+                                    onPrevious={handlePrevious}
+                                    onNext={handleNext}
+                                    onSeek={handleSeek}
+                                    onVolumeChange={handleVolumeChange}
+                                    onToggleShuffle={handleToggleShuffle}
+                                    onCycleRepeat={handleCycleRepeat}
+                                />
+                            </NowPlaying>
+                        </div>
+                        {error ? <p className="error app__error">{error}</p> : null}
+                        <div className="app__library">
+                            <aside className="card app__playlists">
+                                <PlaylistList
+                                    playlists={playlistSummaries}
+                                    selectedId={selectedPlaylistId}
+                                    onSelect={handleSelectPlaylist}
+                                    isLoading={isLoading}
+                                />
+                            </aside>
+                            <section className="app__songs">
+                                <TrackList
+                                    tracks={visibleTracks}
+                                    currentTrackId={currentTrack?.id ?? null}
+                                    onSelectTrack={handleSelectTrack}
+                                    isLoading={isLoading}
+                                    filterValue={filter}
+                                    onFilterChange={setFilter}
+                                    onRefresh={refreshTracks}
+                                    sortKey={sortOptions.key}
+                                    sortDirection={sortOptions.direction}
+                                    onSortChange={handleSortChange}
+                                    title={selectedPlaylist?.label ?? "Songs"}
+                                />
+                            </section>
+                        </div>
                     </>
                 ) : (
                     <section className="app__main app__main--center">
@@ -619,6 +732,27 @@ export default function App() {
                     </section>
                 )}
             </main>
+            {connected ? (
+                <aside
+                    className="connection-dock"
+                    tabIndex={0}
+                    role="complementary"
+                    aria-label="Connection details"
+                >
+                    <div className="connection-dock__tab" aria-hidden="true">
+                        Connection
+                    </div>
+                    <div className="connection-dock__card">
+                        <ConnectionCard
+                            connection={connection}
+                            trackCount={tracks.length}
+                            isLoading={isLoading}
+                            onRefresh={refreshTracks}
+                            onDisconnect={disconnect}
+                        />
+                    </div>
+                </aside>
+            ) : null}
             <audio ref={audioRef} hidden preload="none" />
         </div>
     );

@@ -24,6 +24,7 @@ export interface TrackListProps {
     sortKey: TrackSortKey;
     sortDirection: TrackSortDirection;
     onSortChange: (key: TrackSortKey) => void;
+    title?: string;
 }
 
 export default function TrackList({
@@ -36,7 +37,8 @@ export default function TrackList({
     onRefresh,
     sortKey,
     sortDirection,
-    onSortChange
+    onSortChange,
+    title
 }: TrackListProps) {
     const hasTracks = tracks.length > 0;
 
@@ -48,7 +50,7 @@ export default function TrackList({
     return (
         <section className="card track-list">
             <header className="track-list__header">
-                <h2>Library</h2>
+                <h2>{title ?? "Library"}</h2>
                 <div className="track-list__actions">
                     <label className="search-field">
                         <img src={searchIcon} alt="" aria-hidden className="icon" />
