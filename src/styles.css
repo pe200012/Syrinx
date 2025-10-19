@@ -133,6 +133,11 @@ p {
 
 .app__hero {
     display: flex;
+    z-index: 10;
+}
+
+.app__hero .card {
+    width: 100%;
 }
 
 .app__library {
@@ -154,7 +159,7 @@ p {
 
 .app__playlists {
     position: sticky;
-    top: 24px;
+    top: 150px;
 }
 
 .app__error {

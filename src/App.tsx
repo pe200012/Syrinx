@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Sticky from "react-stickynode";
 import ConnectionCard from "./components/ConnectionCard";
 import LoginForm from "./components/LoginForm";
 import NowPlaying from "./components/NowPlaying";
@@ -665,30 +666,32 @@ export default function App() {
             <main className={`app__layout ${connected ? "app__layout--connected" : "app__layout--auth"}`}>
                 {connected ? (
                     <>
-                        <div className="app__hero">
-                            <NowPlaying
-                                track={currentTrack ?? null}
-                                coverArtUrl={coverArtUrl}
-                                isPlaying={isPlaying}
-                            >
-                                <PlayerControls
+                        <Sticky enabled={true} top={24} bottomBoundary=".app__layout--connected">
+                            <div className="app__hero">
+                                <NowPlaying
+                                    track={currentTrack ?? null}
+                                    coverArtUrl={coverArtUrl}
                                     isPlaying={isPlaying}
-                                    currentTime={currentTime}
-                                    duration={duration}
-                                    volume={volume}
-                                    repeatMode={repeatMode}
-                                    shuffle={shuffle}
-                                    disableControls={!currentTrack || isTrackLoading}
-                                    onPlayPause={handlePlayPause}
-                                    onPrevious={handlePrevious}
-                                    onNext={handleNext}
-                                    onSeek={handleSeek}
-                                    onVolumeChange={handleVolumeChange}
-                                    onToggleShuffle={handleToggleShuffle}
-                                    onCycleRepeat={handleCycleRepeat}
-                                />
-                            </NowPlaying>
-                        </div>
+                                >
+                                    <PlayerControls
+                                        isPlaying={isPlaying}
+                                        currentTime={currentTime}
+                                        duration={duration}
+                                        volume={volume}
+                                        repeatMode={repeatMode}
+                                        shuffle={shuffle}
+                                        disableControls={!currentTrack || isTrackLoading}
+                                        onPlayPause={handlePlayPause}
+                                        onPrevious={handlePrevious}
+                                        onNext={handleNext}
+                                        onSeek={handleSeek}
+                                        onVolumeChange={handleVolumeChange}
+                                        onToggleShuffle={handleToggleShuffle}
+                                        onCycleRepeat={handleCycleRepeat}
+                                    />
+                                </NowPlaying>
+                            </div>
+                        </Sticky>
                         {error ? <p className="error app__error">{error}</p> : null}
                         <div className="app__library">
                             <aside className="card app__playlists">

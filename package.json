@@ -11,9 +11,11 @@
     },
     "dependencies": {
         "@fluentui/svg-icons": "1.1.245",
+        "@types/react-stickynode": "^4.0.3",
         "music-metadata": "11.9.0",
         "react": "19.2.0",
         "react-dom": "19.2.0",
+        "react-stickynode": "^5.0.2",
         "webdav": "5.8.0"
     },
     "devDependencies": {
