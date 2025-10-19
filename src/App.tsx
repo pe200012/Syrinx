@@ -7,6 +7,7 @@ import TrackList from "./components/TrackList";
 import type { ConnectionConfig, Track } from "./types";
 import { WebDavAudioClient } from "./services/webdavClient";
 import { filterTracks, sortTracks } from "./utils/tracks";
+import { explainConnectionError } from "./utils/errors";
 
 const STORAGE_KEY = "webdav-music-player:connection";
 
@@ -147,9 +148,8 @@ export default function App() {
                 setConnection(null);
                 setTracks([]);
                 setCurrentTrackId(null);
-                setError(
-                    err instanceof Error ? err.message : "Failed to connect to WebDAV server."
-                );
+                const friendly = explainConnectionError(err, config);
+                setError(friendly);
             } finally {
                 setIsLoading(false);
             }
@@ -175,7 +175,7 @@ export default function App() {
             });
         } catch (err) {
             console.error(err);
-            setError(err instanceof Error ? err.message : "Failed to refresh tracks.");
+            setError(connection ? explainConnectionError(err, connection) : "Failed to refresh tracks.");
         } finally {
             setIsLoading(false);
         }
