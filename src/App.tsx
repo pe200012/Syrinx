@@ -83,6 +83,10 @@ export default function App() {
     const [repeatMode, setRepeatMode] = useState<RepeatMode>("off");
     const [coverArtUrl, setCoverArtUrl] = useState<string | null>(null);
     const [sortOptions, setSortOptions] = useState<TrackSortOptions>({ key: "title", direction: "asc" });
+    const tracksRef = useRef<Track[]>(tracks);
+    const pendingMetadataRef = useRef<Set<string>>(new Set());
+    const metadataWorkerAbortRef = useRef<{ cancelled: boolean } | null>(null);
+    const metadataWorkerRunningRef = useRef(false);
 
     const visibleTracks = useMemo(
         () => sortTracks(filterTracks(tracks, filter), sortOptions),
@@ -187,53 +191,130 @@ export default function App() {
         }
     }, [client, connection, sortOptions]);
 
-    const updateTrackMetadata = useCallback(
-        (trackId: string, metadata: TrackMetadata | null) => {
+    const applyMetadataUpdates = useCallback(
+        (entries: Array<{ id: string; metadata: TrackMetadata | null }>) => {
+            if (entries.length === 0) {
+                return;
+            }
+
             setTracks((prev: Track[]) => {
-                const updated = prev.map((track) =>
-                    track.id === trackId
-                        ? {
-                            ...track,
-                            metadata: metadata ?? null
-                        }
-                        : track
-                );
-                return sortTracks(updated, sortOptions);
+                const updates = new Map(entries.map(({ id, metadata }) => [id, metadata]));
+                let mutated = false;
+                const updated = prev.map((track) => {
+                    if (!updates.has(track.id)) {
+                        return track;
+                    }
+                    mutated = true;
+                    return {
+                        ...track,
+                        metadata: updates.get(track.id) ?? null
+                    };
+                });
+
+                return mutated ? sortTracks(updated, sortOptions) : prev;
             });
         },
         [sortOptions]
     );
 
-    useEffect(() => {
+    const startMetadataWorker = useCallback(() => {
         if (!client) return;
-        const candidates = visibleTracks.filter((track) => track.metadata === undefined).slice(0, 20);
-        if (candidates.length === 0) {
-            return;
-        }
-        let cancelled = false;
+        if (metadataWorkerRunningRef.current) return;
+        if (pendingMetadataRef.current.size === 0) return;
 
-        const fetchMetadataSequentially = async () => {
-            for (const track of candidates) {
-                try {
-                    const metadata = await client.inferMetadata(track.path);
-                    if (!cancelled) {
-                        updateTrackMetadata(track.id, metadata);
-                    }
-                } catch (metadataError) {
-                    console.warn("Failed to read metadata", metadataError);
-                    if (!cancelled) {
-                        updateTrackMetadata(track.id, null);
+        const controller = { cancelled: false };
+        metadataWorkerAbortRef.current = controller;
+        metadataWorkerRunningRef.current = true;
+
+        const processQueue = async () => {
+            const BATCH_SIZE = 16;
+
+            while (!controller.cancelled) {
+                const ids = Array.from(pendingMetadataRef.current).slice(0, BATCH_SIZE);
+                if (ids.length === 0) {
+                    break;
+                }
+
+                const results = await Promise.all(
+                    ids.map(async (id) => {
+                        const track = tracksRef.current.find((candidate) => candidate.id === id);
+                        if (!track) {
+                            return null;
+                        }
+                        try {
+                            const metadata = await client.inferMetadata(track.path);
+                            return { id, metadata };
+                        } catch (metadataError) {
+                            console.warn("Failed to read metadata", metadataError);
+                            return { id, metadata: null };
+                        }
+                    })
+                );
+
+                ids.forEach((id) => {
+                    pendingMetadataRef.current.delete(id);
+                });
+
+                if (!controller.cancelled) {
+                    const entries = results
+                        .filter((entry): entry is { id: string; metadata: TrackMetadata | null } => entry !== null)
+                        .map(({ id, metadata }) => ({ id, metadata }));
+                    if (entries.length > 0) {
+                        applyMetadataUpdates(entries);
                     }
                 }
             }
+
+            metadataWorkerRunningRef.current = false;
+            metadataWorkerAbortRef.current = null;
         };
 
-        void fetchMetadataSequentially();
+        void processQueue();
+    }, [client, applyMetadataUpdates]);
 
+    useEffect(() => {
+        tracksRef.current = tracks;
+    }, [tracks]);
+
+    useEffect(() => {
+        if (metadataWorkerAbortRef.current) {
+            metadataWorkerAbortRef.current.cancelled = true;
+            metadataWorkerAbortRef.current = null;
+        }
+        metadataWorkerRunningRef.current = false;
+        pendingMetadataRef.current.clear();
+    }, [client]);
+
+    useEffect(() => {
         return () => {
-            cancelled = true;
+            if (metadataWorkerAbortRef.current) {
+                metadataWorkerAbortRef.current.cancelled = true;
+            }
+            metadataWorkerRunningRef.current = false;
+            pendingMetadataRef.current.clear();
         };
-    }, [client, updateTrackMetadata, visibleTracks]);
+    }, []);
+
+    useEffect(() => {
+        if (!client) return;
+        const pending = visibleTracks.filter((track) => track.metadata === undefined);
+        if (pending.length === 0) {
+            return;
+        }
+
+        pending.forEach((track) => {
+            pendingMetadataRef.current.add(track.id);
+        });
+
+        applyMetadataUpdates(
+            pending.map((track) => ({
+                id: track.id,
+                metadata: null
+            }))
+        );
+
+        startMetadataWorker();
+    }, [client, visibleTracks, applyMetadataUpdates, startMetadataWorker]);
 
     const advanceToNextTrack = useCallback(
         (auto = false) => {
